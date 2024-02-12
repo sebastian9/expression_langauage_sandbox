@@ -2,8 +2,6 @@
 
 namespace App;
 
-require __DIR__ . '/../vendor/autoload.php';
-
 use Symfony\Component\ExpressionLanguage\ExpressionLanguage;
 use Symfony\Component\ExpressionLanguage\ExpressionFunction;
 use Symfony\Component\ExpressionLanguage\ExpressionFunctionProviderInterface;
@@ -11,7 +9,7 @@ use Symfony\Component\ExpressionLanguage\ExpressionFunctionProviderInterface;
 class SpecExpressionLanguageProvider implements ExpressionFunctionProviderInterface
 {
     /**
-     * @var \App\Services\ExpressionLanguageService
+     * @var \App\SpecExpressionLanguageProvider
      */
     private $_lang;
 
@@ -30,8 +28,7 @@ class SpecExpressionLanguageProvider implements ExpressionFunctionProviderInterf
         return [
             $this->_buildAnyExpression(),
             $this->_buildAllExpression(),
-            $this->_buildMapExpression(),
-            $this->_buildUpperExpression()
+            $this->_buildSumExpression()
         ];
     }
 
@@ -86,38 +83,19 @@ class SpecExpressionLanguageProvider implements ExpressionFunctionProviderInterf
     }
 
     /**
-     * Builds the map expression to mimic array_map behavior.
+     * Returns results for a "sum" request, adding all the values in an array
      *
      * @return \Symfony\Component\ExpressionLanguage\ExpressionFunction
      */
-    private function _buildMapExpression(): ExpressionFunction
+    private function _buildSumExpression(): ExpressionFunction
     {
-        return new ExpressionFunction('map', function ($arr, $callback): string {
-            // Compilation logic: generate the PHP code to be executed
-            // Note: This is a simplistic implementation and might need to be adapted based on the callback's complexity and context
-            return sprintf('array_map(%2$s, %1$s)', $arr, $callback);
-        }, function ($arguments, $arr, $callback) {
-            // Evaluation logic: execute the callback on each element of the array
-            if (!is_array($arr) || !is_callable($callback)) {
-                throw new \InvalidArgumentException('The first argument must be an array and the second argument must be a callable');
+        return new ExpressionFunction('sum', function ($arr): string {
+            return sprintf('is_array(%1$s) ? array_sum(%1$s) : 0', $arr);
+        }, function ($arguments, $arr): int {
+            if (!is_array($arr)) {
+                return 0;
             }
-
-            return array_map($callback, $arr);
-        });
-    }
-
-
-    /**
-     * Registers the `upper` function
-     * 
-     * @return \Symfony\Component\ExpressionLanguage\ExpressionFunction
-     */
-    private function _buildUpperExpression(): ExpressionFunction
-    {
-        return new ExpressionFunction('upper', function ($str): string {
-            return sprintf('strtoupper(%s)', $str);
-        }, function ($arguments, $str) {
-            return strtoupper($str);
+            return array_sum($arr);
         });
     }
 

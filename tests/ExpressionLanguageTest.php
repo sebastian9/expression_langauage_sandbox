@@ -1,7 +1,6 @@
 <?php
 
-use App\SpecExpressionLanguageProvider;
-use Symfony\Component\ExpressionLanguage\ExpressionLanguage;
+use App\RulesEngine;
 
 class ExpressionLanguageTest extends \PHPUnit\Framework\TestCase
 
@@ -10,8 +9,7 @@ class ExpressionLanguageTest extends \PHPUnit\Framework\TestCase
 
     protected function setUp(): void
     {
-        $this->expressionLanguage = new ExpressionLanguage();
-        $this->expressionLanguage->registerProvider(new SpecExpressionLanguageProvider());
+        $this->expressionLanguage = new RulesEngine();
     }
 
     public function testBasic() {
@@ -31,27 +29,6 @@ class ExpressionLanguageTest extends \PHPUnit\Framework\TestCase
         $this->assertTrue($this->expressionLanguage->evaluate('any([false, 0, "yes"])'));
         $this->assertFalse($this->expressionLanguage->evaluate('any([false, 0, ""])'));
         $this->assertFalse($this->expressionLanguage->evaluate('any("not an array")'));
-    }
-
-    public function testMapWithValidArray()
-    {
-        $result = $this->expressionLanguage->evaluate('map(["hello", "world"], "upper")');
-
-        $this->assertEquals(['HELLO', 'WORLD'], $result, 'The map function should uppercase each element in the array.');
-    }
-
-    public function testMapWithNonArray()
-    {
-        $result = $this->expressionLanguage->evaluate('map("not an array", "upper")');
-
-        $this->assertEquals('not an array', $result, 'The map function should return the input unchanged if it is not an array.');
-    }
-
-    public function testMapWithEmptyArray()
-    {
-        $result = $this->expressionLanguage->evaluate('map([], "upper")');
-
-        $this->assertEmpty($result, 'The map function should return an empty array when given an empty array.');
     }
 
     public function testFlag20()
@@ -93,16 +70,55 @@ class ExpressionLanguageTest extends \PHPUnit\Framework\TestCase
     }
 
 
-    public function TestFlag35() {
-        $flag_35 = "any(R802[i] == 'Yes' and R804[i]/I325[i]<= 0.5 and R804[i] - I325[i] < -5 for i in R738)";
+    public function testFlag35() {
+
+        $flag_35 = "R802[i] == 'Yes' and R804[i]/I325[i] <= 0.5 and R804[i] - I325[i] < -5";
 
         $flag_35_context = [
             "R802" => ["Yes", "No", "Yes"],
-            "R804" => [20, 30, 40],
-            "I325" => [10, 20, 30],
-            "R738" => 3
+            "R804" => [20, 30, 20],
+            "I325" => [10, 20, 40],
         ];
+
+        $index = 3;
         
-        $this->assertTrue($this->expressionLanguage->evaluate($flag_35, $flag_35_context));
+        $this->assertTrue($this->expressionLanguage->unary_test_over_index($flag_35, $index, $flag_35_context));
+
+        $flag_35_context = [
+            "R802" => ["Yes", "No", "No"],
+            "R804" => [20, 30, 20],
+            "I325" => [10, 20, 40],
+        ];
+
+        $this->assertFalse($this->expressionLanguage->unary_test_over_index($flag_35, $index, $flag_35_context));
+    }
+
+    public function testC34() {
+
+        // sum([C26[i] * I126[i] for i in range(int(I269)) if B1[i] and ess_list[i].merged["nominal_voltage_vac"] != "Not Applicable"])
+
+        $step_c34 = "B1[i] and ess_list[i]['merged']['nominal_voltage_vac'] != 'Not Applicable' ? C26[i] * I126[i] : 0";
+        $step_context = [
+            "I126" => [1, 2, 3],
+            "C26" => [10, 20, 30],
+            "B1" => [true, true, true],
+            "ess_list" => [
+                ["merged" => ["nominal_voltage_vac" => 240]],
+                ["merged" => ["nominal_voltage_vac" => "Not Applicable"]],
+                ["merged" => ["nominal_voltage_vac" => 240]]
+            ]
+        ];
+        $step_index = 3;
+        $step_value = $this->expressionLanguage->evaluate_over_index($step_c34, $step_index, $step_context);
+
+        $this->assertEquals([10,0,90], $step_value);
+
+        $c34 = 'sum(step_c34)';
+        $c34_context = [
+            "step_c34" => $step_value
+        ];
+
+        $this->assertEquals(100, $this->expressionLanguage->evaluate($c34, $c34_context));
+
     }
 }
