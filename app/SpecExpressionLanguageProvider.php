@@ -28,7 +28,12 @@ class SpecExpressionLanguageProvider implements ExpressionFunctionProviderInterf
         return [
             $this->_buildAnyExpression(),
             $this->_buildAllExpression(),
-            $this->_buildSumExpression()
+            $this->_buildSumExpression(),
+            $this->_buildFilterNullExpression(),
+            $this->_buildReplaceExpression(),
+            $this->_buildJoinExpression(),
+            $this->_buildSortExpression(),
+            $this->_buildReverseExpression()
         ];
     }
 
@@ -99,6 +104,91 @@ class SpecExpressionLanguageProvider implements ExpressionFunctionProviderInterf
         });
     }
 
+    /**
+     * Returns results for a "filter" request, filtering all null values out of an array
+     *
+     * @return \Symfony\Component\ExpressionLanguage\ExpressionFunction
+     */
+    private function _buildFilterNullExpression(): ExpressionFunction
+    {
+        return new ExpressionFunction('filter', function ($arr): string {
+            return sprintf('is_array(%1$s) ? array_filter(%1$s, function($value) { return $value !== null; }) : []', $arr);
+        }, function ($arguments, $arr): array {
+            if (!is_array($arr)) {
+                return [];
+            }
+            return array_values(array_filter($arr, function($value) { return $value !== null; })); // Reindex the array
+        });
+    }
+
+    /**
+     * Returns results for a string "replace" request, replacing all instances of a substring in a string
+     *
+     * @return \Symfony\Component\ExpressionLanguage\ExpressionFunction
+     */
+    private function _buildReplaceExpression(): ExpressionFunction
+    {
+        return new ExpressionFunction('replace', function ($str, $search, $replace): string {
+            return sprintf('is_string(%1$s) ? str_replace(%2$s, %3$s, %1$s) : ""', $str, $search, $replace);
+        }, function ($arguments, $str, $search, $replace): string {
+            if (!is_string($str)) {
+                return "";
+            }
+            return str_replace($search, $replace, $str);
+        });
+    }
+
+    /**
+     * Returns results for a "join" request, joining all elements of an array into a string
+     *
+     * @return \Symfony\Component\ExpressionLanguage\ExpressionFunction
+     */
+    private function _buildJoinExpression(): ExpressionFunction
+    {
+        return new ExpressionFunction('join', function ($arr, $separator): string {
+            return sprintf('is_array(%1$s) ? implode(%2$s, %1$s) : ""', $arr, $separator);
+        }, function ($arguments, $arr, $separator): string {
+            if (!is_array($arr)) {
+                return "";
+            }
+            return implode($separator, $arr);
+        });
+    }
+
+    /**
+     * Returns results for a "sort" request, sorting an array in ascending order
+     *
+     * @return \Symfony\Component\ExpressionLanguage\ExpressionFunction
+     */
+    private function _buildSortExpression(): ExpressionFunction
+    {
+        return new ExpressionFunction('sort', function ($arr): string {
+            return sprintf('is_array(%1$s) ? sort(%1$s) : []', $arr);
+        }, function ($arguments, $arr): array {
+            if (!is_array($arr)) {
+                return [];
+            }
+            sort($arr);
+            return $arr;
+        });
+    }
+
+    /**
+     * Returns results for a "reverse" request, reversing the order of an array
+     *
+     * @return \Symfony\Component\ExpressionLanguage\ExpressionFunction
+     */
+    private function _buildReverseExpression(): ExpressionFunction
+    {
+        return new ExpressionFunction('reverse', function ($arr): string {
+            return sprintf('is_array(%1$s) ? array_reverse(%1$s) : []', $arr);
+        }, function ($arguments, $arr): array {
+            if (!is_array($arr)) {
+                return [];
+            }
+            return array_reverse($arr);
+        });
+    }
 }
 
 
